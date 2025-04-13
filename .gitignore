@@ -13,8 +13,10 @@ Thumbs.db
 
 #Python envoironment
 venv/
+__pycache__/
 
 # Ignore compiled files
 *.class
 *.o
 *.so
+*.out
