@@ -20,3 +20,5 @@ __pycache__/
 *.o
 *.so
 *.out
+*.csv
+*.zip
