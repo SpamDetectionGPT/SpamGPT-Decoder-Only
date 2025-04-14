@@ -9,8 +9,10 @@ import zipfile
 import os
 import pandas as pd
 
-import kagglehub
 
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+
+model = SpamGPT(SpamGPTConfig()).to(device)
 
 with zipfile.ZipFile("./spam-mails-dataset.zip", 'r') as zip_ref:
     zip_ref.extractall("./")
@@ -29,9 +31,15 @@ for example, label in zip(text, labels):
         label = 50261
     encoded += [50259, label, 50260]
 
-buff = torch.tensor(encoded)
-buff = buff[:1599489]
-x = buff[:-1].view(1562, 1024)
-y = buff[1:].view(1562, 1024)
-print(x[:4])
-print(y[:4])
+buff = torch.tensor(encoded).to(device)
+buff = buff[:1600001]
+x = buff[:-1].view(6250, 256)
+y = buff[1:].view(6250, 256)
+
+x = x[:64]
+y = y[:64]
+criteria = nn.CrossEntropyLoss()
+pred = model(x)
+print(criteria(pred.view(-1, pred.size(-1)), y.view(-1)))
+
+
