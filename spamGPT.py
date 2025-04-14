@@ -22,7 +22,7 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.config.n_head, C // self.config.n_head).transpose(1, 2)
         v = v.view(B, T, self.config.n_head, C // self.config.n_head).transpose(1, 2)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.bias[:, :, T, T] == 0, float('-inf'))
+        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
         y = att @ v
         y = y.transpose(1, 2).contiguous().view(B, T, C)
