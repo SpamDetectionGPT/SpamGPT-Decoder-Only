@@ -1,0 +1,34 @@
+{
+  "dataset": [
+    {
+      "text": "[CLS] email_from: \"Bank Security\" <security@yourbank.com> [SEP] email_to: <customer@email.com> [SEP] subject: Urgent: Your Account Has Been Locked [SEP] message: Dear Customer, We have detected unusual activity on your account. For your security, we have temporarily locked your account. To unlock your account, please click on the following link and verify your identity: http://yourbank.secure-login.com. If you did not attempt to access your account, please contact us immediately at 1-800-123-4567. Thank you for your prompt attention to this matter. Sincerely, Bank Security Team"
+    },
+    {
+      "text": "[CLS] email_from: \"Netflix Support\" <support@netflix.com> [SEP] email_to: <user@email.com> [SEP] subject: Update Your Payment Information [SEP] message: Hello, We are unable to process your last payment for your Netflix subscription. To avoid interruption of your service, please update your payment information by clicking here: http://netflix.update-info.com. If you have any questions, please contact our customer service team. Thank you, Netflix Support"
+    },
+    {
+      "text": "[CLS] email_from: \"Amazon\" <no-reply@amazon.com> [SEP] email_to: <shopper@email.com> [SEP] subject: Your Order Has Been Shipped [SEP] message: Your recent order #12345 has been shipped. Click here to track your package: http://amazon.track-order.com. Please note that this link is only valid for 24 hours. Thank you for shopping with Amazon."
+    },
+    {
+      "text": "[CLS] email_from: \"PayPal\" <service@paypal.com> [SEP] email_to: <user@email.com> [SEP] subject: Suspicious Login Attempt [SEP] message: We noticed a login attempt from a new device. If this was you, you can ignore this email. If not, please secure your account by clicking here: http://paypal.secure-account.com. Thank you, PayPal Security Team"
+    },
+    {
+      "text": "[CLS] email_from: \"Microsoft\" <support@microsoft.com> [SEP] email_to: <user@email.com> [SEP] subject: Your Subscription Is About To Expire [SEP] message: Your Microsoft 365 subscription will expire in 3 days. To renew your subscription and avoid any interruption in service, please click here: http://microsoft.renew-subscription.com. Thank you, Microsoft Support Team"
+    },
+    {
+      "text": "[CLS] email_from: \"Apple\" <no-reply@apple.com> [SEP] email_to: <user@email.com> [SEP] subject: Verify Your Apple ID [SEP] message: We need to verify your Apple ID. Please click the link below to verify your account: http://apple.verify-id.com. If you did not request this verification, please contact us immediately. Thank you, Apple Support"
+    },
+    {
+      "text": "[CLS] email_from: \"LinkedIn\" <security@linkedin.com> [SEP] email_to: <professional@email.com> [SEP] subject: New Login From Unrecognized Device [SEP] message: We detected a new login to your LinkedIn account from an unrecognized device. If this was you, you can ignore this message. If not, please secure your account by clicking here: http://linkedin.secure-account.com. Thank you, LinkedIn Security Team"
+    },
+    {
+      "text": "[CLS] email_from: \"Twitter\" <support@twitter.com> [SEP] email_to: <user@email.com> [SEP] subject: Your Account Has Been Temporarily Restricted [SEP] message: Your Twitter account has been temporarily restricted due to suspicious activity. To restore your account, please verify your identity by clicking here: http://twitter.verify-account.com. Thank you, Twitter Support"
+    },
+    {
+      "text": "[CLS] email_from: \"Instagram\" <security@instagram.com> [SEP] email_to: <user@email.com> [SEP] subject: Unusual Login Attempt [SEP] message: We noticed an unusual login attempt to your Instagram account. If this was you, you can ignore this message. If not, please secure your account by clicking here: http://instagram.secure-account.com. Thank you, Instagram Security Team"
+    },
+    {
+      "text": "[CLS] email_from: \"Google\" <no-reply@google.com> [SEP] email_to: <user@email.com> [SEP] subject: Action Required: Secure Your Google Account [SEP] message: We detected unusual activity in your Google account. To secure your account, please verify your identity by clicking here: http://google.verify-account.com. Thank you, Google Security Team"
+    }
+  ]
+}

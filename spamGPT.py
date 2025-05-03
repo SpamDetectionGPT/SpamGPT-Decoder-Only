@@ -80,4 +80,52 @@ class SpamGPT(nn.Module):
         x = self.transformer['ln_f'](x)
         return self.lm_head(x)
 
-    
+@torch.no_grad()
+def generate(
+    model,
+    idx,
+    max_new_tokens: int,
+    temperature: float = 1.0,
+    top_k: int = None,
+):
+    """
+    Generates new tokens from the model given a context idx.
+
+    Args:
+        model: Instance of SpamGPT or compatible transformer model.
+        idx (torch.LongTensor): Input token IDs of shape (B, T).
+        max_new_tokens (int): Number of tokens to generate.
+        temperature (float): Sampling temperature; higher means more random.
+        top_k (int, optional): If specified, use top-k sampling.
+
+    Returns:
+        torch.LongTensor: Generated token IDs of shape (B, T+max_new_tokens).
+    """
+    model.eval()
+    device = next(model.parameters()).device
+    idx = idx.to(device)
+
+    for _ in range(max_new_tokens):
+        # ensure context length does not exceed the model's block size
+        context = idx if idx.size(1) <= model.config.block_size else idx[:, -model.config.block_size:]
+        # forward pass
+        logits = model(context)
+        # focus on last time-step logits
+        logits = logits[:, -1, :] / temperature
+
+        # optionally apply top-k filtering
+        if top_k is not None:
+            # find the top-k logits
+            topk_vals, _ = torch.topk(logits, top_k, dim=-1)
+            # mask logits not in top-k
+            min_topk = topk_vals[:, -1].unsqueeze(-1)
+            logits = torch.where(logits < min_topk, torch.full_like(logits, -float('Inf')), logits)
+
+        # convert to probabilities
+        probs = F.softmax(logits, dim=-1)
+        # sample or take the most likely token
+        next_token = torch.multinomial(probs, num_samples=1)
+
+        # append to sequence
+        idx = torch.cat((idx, next_token), dim=1)
+    return idx
