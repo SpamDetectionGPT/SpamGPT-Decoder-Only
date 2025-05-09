@@ -8,6 +8,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+datasets/
+
 # Ignore environment files
 .env
 
