@@ -44,6 +44,13 @@ Each file should follow the format:
 }
 ```
 
+### Data Sources
+The model can be trained on various email datasets:
+- Enron Dataset
+- TREC 2007 Spam Corpus
+
+Note: Due to the large size of these datasets, they are not included in the repository. You'll need to download them separately and place them in the appropriate directories.
+
 ## Setup and Usage
 
 1. Install dependencies:
@@ -51,7 +58,10 @@ Each file should follow the format:
 pip install torch tiktoken tqdm numpy pandas
 ```
 
-2. Prepare your dataset files in the required JSON format
+2. Download and prepare your dataset:
+   - Download the Enron and/or TREC 2007 datasets
+   - Place them in the `datasets/` directory
+   - Run the data preprocessing scripts to generate the combined JSON files
 
 3. Training:
 ```python
@@ -90,5 +100,18 @@ output = run_inference(input_tokens, max_length, model, temp=0.7, enc=enc)
 - `train.py`: Training pipeline
 - `inference.py`: Inference utilities
 - `synth_dataset_ham.py`: Dataset synthesis tool
+
+## Data Management
+
+This project uses large datasets that exceed GitHub's file size limits. To handle this:
+
+1. The raw datasets are not included in the repository
+2. You'll need to download the datasets separately
+3. The combined JSON files (`combined_ham.json` and `combined_spam.json`) are generated during preprocessing
+4. These files should be added to `.gitignore` to prevent accidental commits
+
+To download the datasets:
+1. Enron Dataset: [Add download link]
+2. TREC 2007 Spam Corpus: [Add download link]
 
 

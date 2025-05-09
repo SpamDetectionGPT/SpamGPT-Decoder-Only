@@ -8,7 +8,10 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Dataset files
 datasets/
+combined_ham.json
+combined_spam.json
 
 # Ignore environment files
 .env
@@ -16,12 +19,40 @@ datasets/
 #Python envoironment
 venv/
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Ignore compiled files
 *.class
 *.o
-*.so
 *.out
 *.csv
 *.zip
 *.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Virtual Environment
+ENV/
+env/
