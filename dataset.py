@@ -53,34 +53,42 @@ class SpamDataset(Dataset):
                 text = self.encoder.decode(encodings)
                 text = f"<SOE>{text}<EOE><SOP><SPAM><EOP>"
                 self.data.append(text)
+        
         random.shuffle(self.data)
-        encoded_data = [self.encoder.encode(text, allowed_special=self.allowed_special) for text in self.data]
+        
+        # Combine all data into one long string
+        self.combined_text = "".join(self.data)
+        self.encoded_data = self.encoder.encode(self.combined_text, allowed_special=self.allowed_special)
+        
+        # Calculate total length and number of blocks
+        self.total_length = len(self.encoded_data)
+        self.num_blocks = self.total_length // self.block_size
+        
         print(f"""
         General Information:
-        Average block length: {sum(len(enc) for enc in encoded_data) / len(encoded_data)}
-        Total length: {len(encoded_data)}
-        Total ham length: {len([text for text in self.data if "<HAM>" in text])}
-        Total spam length: {len([text for text in self.data if "<SPAM>" in text])}
-        Standard deviation: {np.std([len(enc) for enc in encoded_data])}
+        Total tokens: {self.total_length}
+        Number of blocks: {self.num_blocks}
+        Block size: {self.block_size}
+        Total ham examples: {len([text for text in self.data if "<HAM>" in text])}
+        Total spam examples: {len([text for text in self.data if "<SPAM>" in text])}
         """)
 
     def __len__(self):
-        return len(self.data)
+        return self.num_blocks
 
     def __getitem__(self, idx):
-        text = self.data[idx]
+        # Calculate start and end indices for this block
+        start_idx = idx * self.block_size
+        end_idx = start_idx + self.block_size
         
-        # Encode the text with allowed_special to handle our custom tokens
-        encodings = self.encoder.encode(text, allowed_special=self.allowed_special)
-        
-        # Convert to tensor
-        x = torch.tensor(encodings, dtype=torch.long)
+        # Get the block of tokens
+        x = torch.tensor(self.encoded_data[start_idx:end_idx], dtype=torch.long)
         
         # Create labels by shifting input by one position
         y = torch.cat([x[1:], torch.tensor([0])])
         
         return x, y
-    
+
 def create_dataloaders(ham_file: str, spam_file: str, block_size: int, encoder, 
                       batch_size: int = 32, train_split: float = 0.8) -> Tuple[DataLoader, DataLoader]:
     """
@@ -109,7 +117,7 @@ def create_dataloaders(ham_file: str, spam_file: str, block_size: int, encoder,
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     
-    return train_loader, val_loader 
+    return train_loader, val_loader
 
 
 if __name__ == "__main__":
@@ -118,7 +126,7 @@ if __name__ == "__main__":
         spam_file='combined_spam.json',
         block_size=SpamGPTConfig.block_size,
         encoder=enc,
-        batch_size=32)
+        batch_size=512)
     
     
     

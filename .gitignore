@@ -3,6 +3,8 @@ node_modules/
 
 # Ignore logs
 *.log
+wandb/
+checkpoints/
 
 # Ignore system files
 .DS_Store

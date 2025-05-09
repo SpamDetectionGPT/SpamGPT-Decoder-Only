@@ -1,14 +1,31 @@
 import torch
 import torch.nn as nn
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 @dataclass
 class SpamGPTConfig:
-    block_size = 256
-    vocab_size = 50263
-    n_layer = 6
-    n_head = 6
-    n_emb = 312
+    block_size: int = 256
+    vocab_size: int = 50263
+    n_layer: int = 6
+    n_head: int = 6
+    n_emb: int = 312
+    
+    def to_dict(self):
+        return asdict(self)
 
+    @classmethod
+    def from_dict(cls, config_dict):
+        return cls(**config_dict)
 
+# Create a dictionary version of the config
+config_dict = SpamGPTConfig().to_dict()
+
+# Example usage:
+if __name__ == "__main__":
+    # Class version
+    config = SpamGPTConfig()
+    print("Class version:", config)
+    
+    # Dictionary version
+    print("Dictionary version:", config_dict)
