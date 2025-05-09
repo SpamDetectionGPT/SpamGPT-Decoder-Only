@@ -9,56 +9,41 @@ import zipfile
 import os
 import pandas as pd
 import json
+from dataset import create_dataloaders
 
 
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 model = SpamGPT(SpamGPTConfig()).to(device)
 
-with open("combined_spam.json", "rb") as h:
-    ham = json.load(h)
+class Trainer:
+    def __init__(self, model, train_dataset, val_dataset, batch_size=32, epochs=10, lr=1e-4):
+        self.model = model
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.lr = lr
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
+        self.criterion = nn.CrossEntropyLoss()
+        self.train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        self.val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-print(ham[:50])
-
-"""
-encoded = []
-
-for example, label in zip(text, labels):
-    encoded += [50257] + enc.encode(example) + [50258]
-    if labels == "ham":
-        label = 50262
-    else:
-        label = 50261
-    encoded += [50259, label, 50260]
-
-buff = torch.tensor(encoded).to(device)
-buff = buff[:1638401]
-input_ = buff[:-1].view(6400, 256)
-labels_ = buff[1:].view(6400, 256)
-
-
-criteria = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters())
-
-for epoch in range(120):
-    for batches in range(100):
-        x = input_[64*batches:(64 + 64*batches)]
-        y = labels_[64*batches:(64 + 64*batches)]
-        pred = model(x)
-        loss = criteria(pred.view(-1, pred.size(-1)), y.view(-1))
-        optimizer.zero_grad()
-        loss.backward()
-        loss_val = loss.item()
-        optimizer.step()
-        print(f"Epoch: {epoch+1}, Loss: {loss_val}")
-
-    input_id = torch.tensor([[50257]], device=device, dtype=torch.long)
-    output_ids = generate(model, input_id, max_new_tokens=50, temperature=0.8, top_k=50)[0]
-    print(enc.decode(output_ids.tolist()))
-
-
-"""
+    def train(self):
+        for epoch in range(self.epochs):
+            self.model.train()
+            for batch in self.train_loader:
+                inputs, labels = batch
 
 
 
+# Replace the Trainer initialization with:
+train_loader, val_loader = create_dataloaders(
+    ham_file='combined_ham.json',
+    spam_file='combined_spam.json',
+    block_size=SpamGPTConfig.block_size,
+    encoder=enc,
+    batch_size=32
+)
 
+trainer = Trainer(model, train_loader, val_loader, batch_size=32, epochs=10, lr=1e-4)
