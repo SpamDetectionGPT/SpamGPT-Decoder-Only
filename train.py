@@ -58,92 +58,63 @@ class Trainer:
         
         return token_accuracy.item(), sequence_accuracy.item()
 
+    
     def train_epoch(self):
         self.model.train()
         total_loss = 0
-        total_token_accuracy = 0
-        total_sequence_accuracy = 0
-        total_sequences = 0
-        progress_bar = tqdm(self.train_loader, desc="Training")
+        total_samples = 0
+        total_token_predictions = 0
+        total_correct_tokens = 0
+        total_sequence_predictions = 0
+        total_correct_sequences = 0
         
-        # Initialize accumulated metrics
-        accumulated_loss = 0
-        accumulated_token_acc = 0
-        accumulated_seq_acc = 0
+        progress_bar = tqdm(self.train_loader, desc="Training")
         
         for batch_idx, (x, y) in enumerate(progress_bar):
             x, y = x.to(device), y.to(device)
+            batch_size = x.size(0)
+            seq_length = x.size(1)
             
             # Forward pass
             logits = self.model(x)
-            main_loss = self.criterion(logits.view(-1, logits.size(-1)), y.view(-1))
-
-            # --- Auxiliary loss for <SPAM>/<HAM> prediction after <SOP> ---
-            sop_token_id = enc.encode("<SOP>", allowed_special={"<SOP>"})[0]
-            special_tokens_ids = torch.tensor([special_tokens["<SPAM>"], special_tokens["<HAM>"]], device=x.device)
-            sop_positions = (x == sop_token_id).nonzero(as_tuple=True)
-            aux_loss = 0.0
-
-            if len(sop_positions[0]) > 0:
-                # Get logits and targets at <SOP> positions
-                sop_logits = logits[sop_positions[0], sop_positions[1]]
-                sop_targets = y[sop_positions[0], sop_positions[1]]
-                # Mask for <SPAM>/<HAM> targets
-                spam_ham_mask = torch.isin(sop_targets, special_tokens_ids)
-                if spam_ham_mask.any():
-                    aux_loss = self.criterion(sop_logits[spam_ham_mask], sop_targets[spam_ham_mask])
-                    # You can adjust the weight (e.g., 2.0) as needed
-                    loss = main_loss + 2.0 * aux_loss
-                else:
-                    loss = main_loss
-            else:
-                loss = main_loss
-            # -------------------------------------------------------------
-
-            # Normalize loss by gradient accumulation steps
-            loss = loss / self.gradient_accumulation_steps
+            loss = self.criterion(logits.view(-1, logits.size(-1)), y.view(-1))
             
-            # Backward pass
-            loss.backward()
-            
-            # Calculate accuracies
-            token_acc, sequence_acc = self.calculate_accuracy(
-                logits.view(-1, logits.size(-1)), 
-                y.view(-1),
-                x.view(-1)
-            )
+            # Calculate accuracies (returning counts, not rates)
+            correct_tokens, total_tokens, correct_sequences, total_sequences = \
+                self.calculate_accuracy_counts(logits, y, x)
             
             # Accumulate metrics
-            accumulated_loss += loss.item()
-            accumulated_token_acc += token_acc
-            accumulated_seq_acc += sequence_acc
+            total_samples += batch_size
+            total_token_predictions += total_tokens
+            total_correct_tokens += correct_tokens
+            total_sequence_predictions += total_sequences
+            total_correct_sequences += correct_sequences
+            total_loss += loss.item() * batch_size
             
-            # Update weights if we've accumulated enough gradients
+            # Gradient accumulation
+            loss = loss / self.gradient_accumulation_steps
+            loss.backward()
+            
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-                
-                # Update metrics with the accumulated values
-                total_loss += accumulated_loss * self.gradient_accumulation_steps
-                total_token_accuracy += accumulated_token_acc / self.gradient_accumulation_steps
-                total_sequence_accuracy += accumulated_seq_acc / self.gradient_accumulation_steps
-                
-                # Reset accumulated metrics
-                accumulated_loss = 0
-                accumulated_token_acc = 0
-                accumulated_seq_acc = 0
             
-            # Only update progress bar every 20 batches
+            # Update progress bar
             if batch_idx % 20 == 0:
+                current_token_acc = correct_tokens / total_tokens if total_tokens > 0 else 0
+                current_seq_acc = correct_sequences / total_sequences if total_sequences > 0 else 0
                 progress_bar.set_postfix({
-                    'loss': f'{loss.item() * self.gradient_accumulation_steps:.4f}', 
-                    'token_acc': f'{token_acc:.4f}',
-                    'seq_acc': f'{sequence_acc:.4f}'
+                    'loss': f'{loss.item() * self.gradient_accumulation_steps:.4f}',
+                    'token_acc': f'{current_token_acc:.4f}',
+                    'seq_acc': f'{current_seq_acc:.4f}'
                 })
-            
-        return (total_loss / len(self.train_loader), 
-                total_token_accuracy / len(self.train_loader),
-                total_sequence_accuracy / len(self.train_loader))
+        
+        # Calculate final metrics
+        avg_loss = total_loss / total_samples
+        avg_token_accuracy = total_correct_tokens / total_token_predictions if total_token_predictions > 0 else 0
+        avg_sequence_accuracy = total_correct_sequences / total_sequence_predictions if total_sequence_predictions > 0 else 0
+        
+        return avg_loss, avg_token_accuracy, avg_sequence_accuracy
 
     def validate(self):
         self.model.eval()
