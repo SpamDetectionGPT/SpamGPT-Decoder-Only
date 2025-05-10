@@ -17,7 +17,7 @@ combined_spam.json
 
 # Ignore environment files
 .env
-
+nohup.out
 #Python envoironment
 venv/
 __pycache__/

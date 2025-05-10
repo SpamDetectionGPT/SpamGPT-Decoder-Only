@@ -7,9 +7,9 @@ from dataclasses import dataclass, asdict
 class SpamGPTConfig:
     block_size: int = 256
     vocab_size: int = 50263
-    n_layer: int = 6
+    n_layer: int = 12
     n_head: int = 6
-    n_emb: int = 312
+    n_emb: int = 540
     
     def to_dict(self):
         return asdict(self)

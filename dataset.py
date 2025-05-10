@@ -16,6 +16,8 @@ class SpamDataset(Dataset):
         # Define our special tokens
         self.special_tokens = ["<SOE>", "<EOE>", "<SOP>", "<HAM>", "<SPAM>", "<EOP>"]
         self.allowed_special = set(self.special_tokens)
+        print(self.encoder.encode("<SOE><EOE><SOP><HAM><EOP>", allowed_special=self.allowed_special))
+        
         
         # Calculate the effective block size by subtracting the length of special tokens
         special_tokens_length = sum(len(self.encoder.encode(token, allowed_special=self.allowed_special)) 
@@ -53,7 +55,7 @@ class SpamDataset(Dataset):
                 text = self.encoder.decode(encodings)
                 text = f"<SOE>{text}<EOE><SOP><SPAM><EOP>"
                 self.data.append(text)
-        
+        print(self.data[0])
         random.shuffle(self.data)
         
         # Combine all data into one long string

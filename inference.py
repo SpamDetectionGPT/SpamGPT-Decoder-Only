@@ -36,3 +36,39 @@ def run_inference(input_tokens, max_length, model, temp, enc, endtoken=None):
         input_tokens = torch.cat((input_tokens, next_token), dim=1)
     print("\n\n---------------End Inference---------------\n")
     return input_tokens
+
+def get_spam_ham_probabilities(input_tokens, model, temp=0.7):
+    """
+    Get probabilities for SPAM and HAM tokens for the next prediction.
+    
+    Args:
+        input_tokens (torch.Tensor): Input token tensor
+        model: The language model
+        temp (float): Temperature for softmax
+        
+    Returns:
+        tuple: (spam_prob, ham_prob, highest_prob_token) probabilities and highest scored token
+    """
+    model.eval()
+    with torch.no_grad():
+        # Get model prediction
+        pred = model(input_tokens)
+        logits = pred[:,-1,:] # Get logits for next token
+        logits = logits/temp
+        
+        # Get probabilities through softmax for all tokens
+        all_probs = F.softmax(logits, dim=-1)
+        
+        # Get the highest scored token
+        highest_prob_token = enc.decode([torch.argmax(all_probs).item()])
+        
+        # Extract SPAM and HAM logits
+        spam_ham_logits = logits[0, [special_tokens["<SPAM>"], special_tokens["<HAM>"]]]
+        # Apply softmax only to SPAM and HAM logits
+        probs = F.softmax(spam_ham_logits.unsqueeze(0), dim=-1)
+        
+        # Extract spam and ham token probabilities
+        spam_prob = probs[0, 0].item()
+        ham_prob = probs[0, 1].item()
+        
+        return spam_prob, ham_prob, highest_prob_token
