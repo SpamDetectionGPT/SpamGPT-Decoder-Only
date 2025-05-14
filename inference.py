@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 import math
 import tiktoken
+import matplotlib.pyplot as plt
 
 base_encoding = tiktoken.get_encoding("gpt2")
 special_tokens = {
@@ -37,38 +38,72 @@ def run_inference(input_tokens, max_length, model, temp, enc, endtoken=None):
     print("\n\n---------------End Inference---------------\n")
     return input_tokens
 
-def get_spam_ham_probabilities(input_tokens, model, temp=0.7):
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+def get_spam_ham_probabilities(input_tokens, model, temp=1):
     """
-    Get probabilities for SPAM and HAM tokens for the next prediction.
-    
-    Args:
-        input_tokens (torch.Tensor): Input token tensor
-        model: The language model
-        temp (float): Temperature for softmax
-        
-    Returns:
-        tuple: (spam_prob, ham_prob, highest_prob_token) probabilities and highest scored token
+    Returns spam_prob, ham_prob, highest_prob_token
+    and saves a grid of attention maps (one per head) as attention_matrix.png
     """
     model.eval()
     with torch.no_grad():
-        # Get model prediction
-        pred = model(input_tokens)
-        logits = pred[:,-1,:] # Get logits for next token
-        logits = logits/temp
-        
-        # Get probabilities through softmax for all tokens
-        all_probs = F.softmax(logits, dim=-1)
-        
-        # Get the highest scored token
-        highest_prob_token = enc.decode([torch.argmax(all_probs).item()])
-        
-        # Extract SPAM and HAM logits
-        spam_ham_logits = logits[0, [special_tokens["<SPAM>"], special_tokens["<HAM>"]]]
-        # Apply softmax only to SPAM and HAM logits
+        # ----------  spam / ham logic (unchanged) -----------------------
+        pred   = model(input_tokens)
+        logits = pred[:, -1, :] / temp
+        all_p  = F.softmax(logits, dim=-1)
+
+        highest_token = enc.decode([torch.argmax(all_p).item()])
+
+        spam_ham_logits = logits[0, [special_tokens["<SPAM>"],
+                                     special_tokens["<HAM>"]]]
         probs = F.softmax(spam_ham_logits.unsqueeze(0), dim=-1)
-        
-        # Extract spam and ham token probabilities
-        spam_prob = probs[0, 0].item()
-        ham_prob = probs[0, 1].item()
-        
-        return spam_prob, ham_prob, highest_prob_token
+        spam_prob, ham_prob = probs[0].tolist()
+        # ----------------------------------------------------------------
+
+        # ----------  grab the whole attention tensor --------------------
+        att_tensor = model.transformer['h'][-1].attn.latest_attn[0]   # (H, T, T)
+        n_head, T, _ = att_tensor.shape
+        # ----------------------------------------------------------------
+
+        # ----------  decode tokens for tick labels ----------------------
+        tok_ids      = input_tokens[0].tolist()
+        tick_labels  = []
+        for tid in tok_ids:
+            if tid in special_tokens.values():
+                tick_labels.append(next(k for k,v in special_tokens.items() if v == tid))
+            else:
+                tick_labels.append(enc.decode([tid]).replace("\n", "\\n"))
+        # ----------------------------------------------------------------
+
+        # ----------  plotting all heads ---------------------------------
+        cols = 3                               # 2 × 3 grid for 6 heads
+        rows = int(math.ceil(n_head / cols))
+        fig, axes = plt.subplots(rows, cols,
+                                 figsize=(cols*4, rows*4),
+                                 squeeze=False)
+
+        for h in range(n_head):
+            r, c = divmod(h, cols)
+            ax   = axes[r][c]
+            im   = ax.imshow(att_tensor[h].cpu().numpy())
+            ax.set_title(f"Head {h}", fontsize=10)
+            ax.set_xticks(range(T))
+            ax.set_yticks(range(T))
+            ax.set_xticklabels(tick_labels, rotation=90, ha="center", fontsize=6)
+            ax.set_yticklabels(tick_labels, fontsize=6)
+
+        # turn off any empty panes (if n_head is not a multiple of cols)
+        for h in range(n_head, rows*cols):
+            r, c = divmod(h, cols)
+            axes[r][c].axis("off")
+
+        fig.suptitle("Last-Layer Attention Maps", fontsize=12)
+        plt.tight_layout()
+        fig.savefig("attention_matrix.png", dpi=300)
+        plt.close(fig)
+        # ----------------------------------------------------------------
+
+        return spam_prob, ham_prob, highest_token
+

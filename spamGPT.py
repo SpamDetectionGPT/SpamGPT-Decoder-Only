@@ -13,7 +13,8 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                              .view(1, 1, config.block_size, config.block_size))
         self.c_proj = nn.Linear(config.n_emb, config.n_emb)
-    
+        self.latest_attn = None
+
     def forward(self, x):
         B, T, C = x.size()
         qkv = self.c_attn(x)
@@ -21,9 +22,14 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.config.n_head, C // self.config.n_head).transpose(1, 2)
         k = k.view(B, T, self.config.n_head, C // self.config.n_head).transpose(1, 2)
         v = v.view(B, T, self.config.n_head, C // self.config.n_head).transpose(1, 2)
+        
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+        if self.training:
+            att = att.masked_fill(
+                self.bias[:, :, :T, :T] == 0, float('-inf')
+            )
         att = F.softmax(att, dim=-1)
+        self.latest_attn = att.detach()  
         y = att @ v
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.c_proj(y)

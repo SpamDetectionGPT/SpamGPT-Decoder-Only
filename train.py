@@ -13,6 +13,21 @@ from dataset import create_dataloaders
 from tqdm import tqdm
 import time
 import wandb
+import aiohttp
+import asyncio
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+async def send_discord_webhook(text):
+    webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+    if not webhook_url:
+        print("No Discord webhook URL found.")
+        return
+    
+    async with aiohttp.ClientSession() as session:
+        await session.post(webhook_url, json={"content": f"Model Inference:\n```\n{text}\n```"})
 
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
@@ -62,61 +77,84 @@ class Trainer:
     def train_epoch(self):
         self.model.train()
         total_loss = 0
-        total_samples = 0
-        total_token_predictions = 0
-        total_correct_tokens = 0
-        total_sequence_predictions = 0
-        total_correct_sequences = 0
+        total_token_accuracy = 0
+        total_sequence_accuracy = 0
+        num_batches = 0
         
-        progress_bar = tqdm(self.train_loader, desc="Training")
-        
-        for batch_idx, (x, y) in enumerate(progress_bar):
+        for batch_idx, (x, y) in enumerate(self.train_loader):
             x, y = x.to(device), y.to(device)
-            batch_size = x.size(0)
-            seq_length = x.size(1)
             
             # Forward pass
             logits = self.model(x)
-            loss = self.criterion(logits.view(-1, logits.size(-1)), y.view(-1))
+            main_loss = self.criterion(logits.view(-1, logits.size(-1)), y.view(-1))
             
-            # Calculate accuracies (returning counts, not rates)
-            correct_tokens, total_tokens, correct_sequences, total_sequences = \
-                self.calculate_accuracy_counts(logits, y, x)
+            # Auxiliary loss (same as before)
+            sop_token_id = enc.encode("<SOP>", allowed_special={"<SOP>"})[0]
+            special_tokens_ids = torch.tensor([special_tokens["<SPAM>"], special_tokens["<HAM>"]], device=x.device)
+            sop_positions = (x == sop_token_id).nonzero(as_tuple=True)
             
-            # Accumulate metrics
-            total_samples += batch_size
-            total_token_predictions += total_tokens
-            total_correct_tokens += correct_tokens
-            total_sequence_predictions += total_sequences
-            total_correct_sequences += correct_sequences
-            total_loss += loss.item() * batch_size
+            # Normalize loss by gradient accumulation steps
+            loss = main_loss / self.gradient_accumulation_steps
             
-            # Gradient accumulation
-            loss = loss / self.gradient_accumulation_steps
+            # Backward pass
             loss.backward()
             
+            # Calculate accuracies
+            token_acc, sequence_acc = self.calculate_accuracy(
+                logits.view(-1, logits.size(-1)), 
+                y.view(-1),
+                x.view(-1)
+            )
+            
+            # Accumulate metrics
+            total_loss += loss.item() * self.gradient_accumulation_steps
+            total_token_accuracy += token_acc
+            total_sequence_accuracy += sequence_acc
+            num_batches += 1
+            
+            # Update weights and print metrics if we've accumulated enough gradients
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-            
-            # Update progress bar
-            if batch_idx % 20 == 0:
-                current_token_acc = correct_tokens / total_tokens if total_tokens > 0 else 0
-                current_seq_acc = correct_sequences / total_sequences if total_sequences > 0 else 0
-                progress_bar.set_postfix({
-                    'loss': f'{loss.item() * self.gradient_accumulation_steps:.4f}',
-                    'token_acc': f'{current_token_acc:.4f}',
-                    'seq_acc': f'{current_seq_acc:.4f}'
-                })
+                print(f'Batch {batch_idx + 1}: loss={loss.item() * self.gradient_accumulation_steps:.4f}, '
+                    f'token_acc={token_acc:.4f}, seq_acc={sequence_acc:.4f}')
         
-        # Calculate final metrics
-        avg_loss = total_loss / total_samples
-        avg_token_accuracy = total_correct_tokens / total_token_predictions if total_token_predictions > 0 else 0
-        avg_sequence_accuracy = total_correct_sequences / total_sequence_predictions if total_sequence_predictions > 0 else 0
+        # Calculate averages over all batches
+        avg_loss = total_loss / num_batches
+        avg_token_accuracy = total_token_accuracy / num_batches
+        avg_sequence_accuracy = total_sequence_accuracy / num_batches
         
         return avg_loss, avg_token_accuracy, avg_sequence_accuracy
 
     def validate(self):
+        self.model.eval()
+        total_loss = 0
+        total_token_accuracy = 0
+        total_sequence_accuracy = 0
+        
+        with torch.no_grad():
+            for batch_idx, (x, y) in enumerate(self.val_loader):
+                x, y = x.to(device), y.to(device)
+                logits = self.model(x)
+                loss = self.criterion(logits.view(-1, logits.size(-1)), y.view(-1))
+                token_acc, sequence_acc = self.calculate_accuracy(
+                    logits.view(-1, logits.size(-1)), 
+                    y.view(-1),
+                    x.view(-1)
+                )
+                
+                total_loss += loss.item()
+                total_token_accuracy += token_acc
+                total_sequence_accuracy += sequence_acc
+                
+                if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
+                    print(f'Validation Batch {batch_idx + 1}: loss={loss.item():.4f}, '
+                        f'token_acc={token_acc:.4f}, seq_acc={sequence_acc:.4f}')
+                
+        return (total_loss / len(self.val_loader), 
+                total_token_accuracy / len(self.val_loader),
+                total_sequence_accuracy / len(self.val_loader))
+
         self.model.eval()
         total_loss = 0
         total_token_accuracy = 0
@@ -156,18 +194,21 @@ class Trainer:
         
         for epoch in range(self.epochs):
             start_time = time.time()
-            if (epoch + 1) % 10 == 0:
+            if ((epoch + 1) % 10 == 0) or epoch == 0:
                 print("\nRunning inference on test examples...")
                 # Create a sample input for inference
                 sample_input = torch.tensor([[enc.encode("[CLS] subject: estimated actuals for april 5")[0]]], device=device)
-                run_inference(
+                result = run_inference(
                     input_tokens=sample_input,
                     max_length=100,
                     model=self.model,
                     temp=0.8,
                     enc=enc,
-                    endtoken=enc.encode("<EOE>")[0]
+                    endtoken=enc.encode("<EOE>", allowed_special={"<EOE>"})[0]
                 )
+                result = enc.decode(result.squeeze().tolist())
+                asyncio.run(send_discord_webhook(result))
+                
             # Training
             train_loss, train_token_acc, train_seq_acc = self.train_epoch()
             
@@ -229,7 +270,7 @@ if __name__ == "__main__":
         train_loader=train_loader,
         val_loader=val_loader,
         batch_size=32,
-        epochs=50,
+        epochs=15,
         lr=1e-4,
         gradient_accumulation_steps=4
     )
