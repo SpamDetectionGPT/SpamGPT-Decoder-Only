@@ -47,7 +47,7 @@ if __name__ == "__main__":
     # Example prompts
     prompts = [
     # ---------- SPAM ----------
-    """<SOE>HUGE SALE!!! \n\n URGENT \n\n CLICK HERE TO GET YOUR DISCOUNT \n\n <EOE><SOP><SPAM><SOP> [CLS] """,
+    """<SOE>Hello I am from Microsoft. I am calling to tell you that you have won a $1000 gift card. Please click the link below to claim your prize. <EOE><SOP>""",
 
 ]
     

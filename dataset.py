@@ -12,12 +12,11 @@ class SpamDataset(Dataset):
     def __init__(self, ham_file: str, spam_file: str, block_size: int, encoder):
         self.block_size = block_size
         self.encoder = encoder
-        
+        random.seed(42)
         # Define our special tokens
         self.special_tokens = ["<SOE>", "<EOE>", "<SOP>", "<HAM>", "<SPAM>", "<EOP>"]
         self.allowed_special = set(self.special_tokens)
         print(self.encoder.encode("<SOE><EOE><SOP><HAM><EOP>", allowed_special=self.allowed_special))
-        
         
         # Calculate the effective block size by subtracting the length of special tokens
         special_tokens_length = sum(len(self.encoder.encode(token, allowed_special=self.allowed_special)) 
@@ -91,41 +90,45 @@ class SpamDataset(Dataset):
         
         return x, y
 
-def create_dataloaders(ham_file: str, spam_file: str, block_size: int, encoder, 
-                      batch_size: int = 32, train_split: float = 0.8) -> Tuple[DataLoader, DataLoader]:
+def create_dataloaders(train_ham_file: str, train_spam_file: str, 
+                      test_ham_file: str, test_spam_file: str,
+                      block_size: int, encoder, 
+                      batch_size: int = 32, seed: int = 42) -> Tuple[DataLoader, DataLoader]:
     """
     Creates train and validation dataloaders for the spam dataset.
     
     Args:
-        ham_file: Path to ham JSON file
-        spam_file: Path to spam JSON file
+        train_ham_file: Path to training ham JSON file
+        train_spam_file: Path to training spam JSON file
+        test_ham_file: Path to test ham JSON file
+        test_spam_file: Path to test spam JSON file
         block_size: Maximum sequence length
         encoder: Tokenizer/encoder to use
         batch_size: Batch size for dataloaders
-        train_split: Proportion of data to use for training
+        seed: Random seed for reproducibility
         
     Returns:
         Tuple of (train_dataloader, val_dataloader)
     """
-    # Create dataset
-    dataset = SpamDataset(ham_file, spam_file, block_size, encoder)
+    # Create train dataset
+    train_dataset = SpamDataset(train_ham_file, train_spam_file, block_size, encoder)
     
-    # Split into train and validation
-    train_size = int(train_split * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    # Create test dataset
+    test_dataset = SpamDataset(test_ham_file, test_spam_file, block_size, encoder)
     
     # Create dataloaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
-    return train_loader, val_loader
+    return train_loader, test_loader
 
 
 if __name__ == "__main__":
-    train_loader, val_loader = create_dataloaders(
-        ham_file='combined_ham.json',
-        spam_file='combined_spam.json',
+    train_loader, test_loader = create_dataloaders(
+        train_ham_file='train_data_ham.json',
+        train_spam_file='train_data_spam.json',
+        test_ham_file='test_data_ham.json',
+        test_spam_file='test_data_spam.json',
         block_size=SpamGPTConfig.block_size,
         encoder=enc,
         batch_size=512)

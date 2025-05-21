@@ -29,7 +29,7 @@ async def send_discord_webhook(text):
     async with aiohttp.ClientSession() as session:
         await session.post(webhook_url, json={"content": f"Model Inference:\n```\n{text}\n```"})
 
-device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 print(device)
 
@@ -257,8 +257,10 @@ if __name__ == "__main__":
     
     # Create dataloaders
     train_loader, val_loader = create_dataloaders(
-        ham_file='combined_ham.json',
-        spam_file='combined_spam.json',
+        train_ham_file='train_data_ham.json',
+        train_spam_file='train_data_spam.json',
+        test_ham_file='test_data_ham.json',
+        test_spam_file='test_data_spam.json',
         block_size=SpamGPTConfig.block_size,
         encoder=enc,
         batch_size=32 
