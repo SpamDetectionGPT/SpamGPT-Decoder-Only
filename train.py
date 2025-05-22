@@ -29,7 +29,7 @@ async def send_discord_webhook(text):
     async with aiohttp.ClientSession() as session:
         await session.post(webhook_url, json={"content": f"Model Inference:\n```\n{text}\n```"})
 
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 print(device)
 
@@ -51,6 +51,10 @@ class Trainer:
         # Create checkpoint directory if it doesn't exist
         self.checkpoint_dir = "checkpoints"
         os.makedirs(self.checkpoint_dir, exist_ok=True)
+        
+        # Add global step counters for wandb
+        self.train_step = 0
+        self.val_step = 0
 
     def calculate_accuracy(self, logits, targets, input_ids):
         # Regular token-level accuracy
@@ -116,6 +120,15 @@ class Trainer:
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+                
+                # Log to wandb after every gradient accumulation update
+                wandb.log({
+                    'train_batch_loss': loss.item() * self.gradient_accumulation_steps,
+                    'train_batch_token_accuracy': token_acc,
+                    'train_batch_sequence_accuracy': sequence_acc,
+                }, step=self.train_step)
+                self.train_step += 1
+                
                 print(f'Batch {batch_idx + 1}: loss={loss.item() * self.gradient_accumulation_steps:.4f}, '
                     f'token_acc={token_acc:.4f}, seq_acc={sequence_acc:.4f}')
         
@@ -147,43 +160,17 @@ class Trainer:
                 total_token_accuracy += token_acc
                 total_sequence_accuracy += sequence_acc
                 
+                # Log to wandb after every validation batch
+                wandb.log({
+                    'val_batch_loss': loss.item(),
+                    'val_batch_token_accuracy': token_acc,
+                    'val_batch_sequence_accuracy': sequence_acc,
+                }, step=self.val_step)
+                self.val_step += 1
+                
                 if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
                     print(f'Validation Batch {batch_idx + 1}: loss={loss.item():.4f}, '
                         f'token_acc={token_acc:.4f}, seq_acc={sequence_acc:.4f}')
-                
-        return (total_loss / len(self.val_loader), 
-                total_token_accuracy / len(self.val_loader),
-                total_sequence_accuracy / len(self.val_loader))
-
-        self.model.eval()
-        total_loss = 0
-        total_token_accuracy = 0
-        total_sequence_accuracy = 0
-        
-        with torch.no_grad():
-            # Store the progress bar in a variable
-            progress_bar =  tqdm(self.val_loader, desc="Validation")
-            for batch_idx, (x, y) in enumerate(progress_bar):
-                x, y = x.to(device), y.to(device)
-                logits = self.model(x)
-                loss = self.criterion(logits.view(-1, logits.size(-1)), y.view(-1))
-                token_acc, sequence_acc = self.calculate_accuracy(
-                    logits.view(-1, logits.size(-1)), 
-                    y.view(-1),
-                    x.view(-1)
-                )
-                
-                total_loss += loss.item()
-                total_token_accuracy += token_acc
-                total_sequence_accuracy += sequence_acc
-                
-                # Now progress_bar is defined and can be used
-                if batch_idx % 20 == 0:
-                    progress_bar.set_postfix({
-                        'loss': f'{loss.item():.4f}', 
-                        'token_acc': f'{token_acc:.4f}',
-                        'seq_acc': f'{sequence_acc:.4f}'
-                    })
                 
         return (total_loss / len(self.val_loader), 
                 total_token_accuracy / len(self.val_loader),
@@ -226,8 +213,9 @@ class Trainer:
                 'val_loss': val_loss,
                 'val_token_accuracy': val_token_acc,
                 'val_sequence_accuracy': val_seq_acc,
-                'epoch_time': epoch_time
-            })
+                'epoch_time': epoch_time,
+                'epoch': epoch
+            }, step=self.train_step - 1)
             
             # Print epoch statistics
             print(f"\nEpoch {epoch + 1}/{self.epochs}")
