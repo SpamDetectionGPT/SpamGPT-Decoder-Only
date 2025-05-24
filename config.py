@@ -5,11 +5,11 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class SpamGPTConfig:
-    block_size: int = 256
+    block_size: int = 1024
     vocab_size: int = 50263
     n_layer: int = 12
-    n_head: int = 6
-    n_emb: int = 720
+    n_head: int = 12
+    n_embd: int = 768
     
     def to_dict(self):
         return asdict(self)
